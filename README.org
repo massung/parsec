@@ -26,11 +26,12 @@ We parsed the string, but didn't really get to do anything with it. In order to 
 
 Taking a closer look at what's defined... 
 
-Digits is a combinator that expects to parse 1 or more of another combinator, which is one of a list of characters (digits). 
+Digits is a combinator that expects to parse one or more of another combinator, which is one of a list of characters (digits). When completed, it will return a list of all the combinator results parsed. Let's test it...
 
-Int is a bit more complex. First, it's going to bind the results of one combinator and hand it off to a function. So, it takes the results of whatever was parsed by Digits and passes it the fun. Inside that fun a new combinator is created that will return what was passed in, converted to an integer.
+: >> parsec:parse("384",Digits).
+: {ok,"384",[]}
 
-Let's try it...
+Int is a bit more complex. First, it's going to bind the results of one combinator and hand it off to a function. That function will do something with the results (or ignore them) and return a new parser combinator to continue parsing with. In this case, it takes the results of whatever was parsed by Digits (a string of numbers) and passes it through list_to_integer/1, and uses the parsec:return/1 combinator to simply return the answer. Let's try it...
 
 : >> parsec:parse("1038340", Int).
 : {ok,103840,[]}
@@ -46,51 +47,91 @@ We essentially got the same value returned, only this time converted to an integ
 
 Just like we bound a combinator to parse digits to a function that could return those digits converted to an integer, we can also chain many values together. So let's create a combinator that does just that.
 
-: >> Add=parsec:bind(Int,fun (A) -> parsec:bind(parsec:do([parsec:char($+),Int]),fun (B) -> parsec:return(A+B) end) end).
+: >> Add=parsec:bind(Int,fun (A) -> 
+:                            parsec:bind(parsec:do([parsec:char($+),Int]),
+:                                        fun (B) -> 
+:                                            parsec:return(A+B) 
+:                                        end) 
+:                        end).
 
-Looking closer, we first parse an Int and pass it into A. We then bind a parsec:do/1 combinator (which returns the last item parsed) to B, finally returning A+B. Let's test it:
+Looking closer, we first parse an Int and store it to a A by binding it to another function. We then bind a parsec:do/1 combinator (which returns the last item parsed) to B, finally returning A+B. Let's test it:
 
 : >> parsec:parse("10+20",Add).
 : {ok,30,[]}
 
 * One-liners and Common Parse Combinators
 
+Here are some common parser combinators that you can use.
+
 ** The fail combinator
+
+When a parse combinator fails, the return value is always the atom 'pzero'. The fail combinator is useful for saying "not possible." For example, when you learn about the lexer module below, if you wanted to say that a language definition didn't support single-line comments, you would set the comment_line combinator to pzero/0.
 
 : >> parsec:parse("test",parsec:pzero()).
 : pzero
 
+** Parsing many and skipping many
+
+The combinators many/1 and many1/1 allow you to parse another combinator zero or more or one or more times, returning a list of what was parsed. The skip/1 combinator will parse another combinator zero or more times, and throw away the result, returning 'undefined' instead.
+
+: >> parsec:parse("aaabbb",parsec:many1(parsec:char($a))).
+: {ok,"aaa","bbb"}
+
+: >> parsec:parse("aaabbb",parsec:skip(parsec:char($a))).
+: {ok,undefined,"bbb"}
+
 ** Capturing whatever text was parsed
+
+If you want to just capture whatever string was parsed, without having to create a long bind-chain of anonymous functions together, then you can use the capture/1 combinator. It simply marks the start of the parse state when it began and returns a list of all the characters parsed by the combinator passed to it.
 
 : >> parsec:parse("test",parsec:capture(parsec:one_of("stuv"))).
 : {ok,"t","est"}
 
 ** Checking for the end of the stream
 
+If you want to guarantee that all the characters of the source string were parsed, then use the eof/0 combinator. It will fail with 'pzero' if there are still characters left to be parsed.
+
 : >> parsec:parse("",parsec:eof()).
 : {ok,eof,[]}
 
 ** Matching any character
+
+Just like the function name suggested, this combinator will only fail if it's at the end of the source string.
 
 : >> parsec:parse("2",parsec:any_char()).
 : {ok,50,[]}
 
 ** Attempt to parse with a default result
 
+The option/2 combinator is simply a shortcut for creating a return/1 combinator with a known value if another combinator fails. 
+
 : >> parsec:parse("aaaa",parsec:option(not_found,parsec:char($b))).
 : {ok,not_found,"aaaa"}
 
+** Maybe parsing
+
+Sometimes you want to parse something if it's there, but not fail if it isn't. The maybe/1 combinator does this. What's important to remember is that regardless of whether or not the combinator works, the end result is 'undefined'. So use it only when you are just skipping characters or in conjuction with the capture/1 combinator.
+
+: >> parsec:parse("hello",parsec:maybe(parsec:char($\n))).
+: {ok,undefined,"hello"}
+
 ** Parsing combinators separated by a combinator
+
+Useful for parsing CSV lines, function arguments, and many other cases where a list of things you want extracted are separated by something you don't care about.
 
 : >> parsec:parse("a,a,a",parsec:sep_by1(parsec:char($a),parsec:char($,))).
 : {ok,"aaa",[]}
 
 ** Parsing until a combinator is found
 
+This let's you keep parsing a repeat combinator until a terminating combinator occurs. A way to think about this might be comments: once"<!--" is parsed, parse any_char() until "-->" is parsed.
+
 : >> parsec:parse("abc.",parsec:many_till(parsec:any_char(),parsec:char($.))).
 : {ok,"abc",[]}
 
 ** Parsing one of a list of combinators
+
+If you have 2 or more possible combinator paths you'd like to go down, using the choice/1 combinator will attempt combinators - in order - until one succeeds. Once a combinator is successful it will cease attempting to parse any that are left. If all the choices fail, then 'pzero' is returned.
 
 : >> parsec:parse("b",parsec:choice([parsec:char($a),parsec:char($b)])).
 : {ok,98,[]}

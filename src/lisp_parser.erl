@@ -19,8 +19,8 @@ make_lexer () ->
 	    comment_line=parsec:string(";"),
 	    ident_start=parsec:choice([?LETTER,special_symbol()]),
 	    ident_letter=parsec:choice([?LETTER,special_symbol()]),
-	    op_start=pzero,
-	    op_letter=pzero,
+	    op_start=parsec:pzero(),
+	    op_letter=parsec:pzero(),
 	    reserved_names=["lambda","let","cond","setq","atom","nil","quote"],
 	    reserved_ops=[]
 	  }.
