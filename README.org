@@ -142,7 +142,7 @@ There are many other parser combinators included with the parsec module that wer
 
 * The Lexer Module
 
-While the parsing module is quite effective on its own, the lexer allows you to easily define programming language definitiosn and then tokenize entire strings quickly. The lexer module takes the hassle out of having to code (sometimes painful) parser combinators for things like comments, strings, floating-point values, identifiers, etc.
+While the parsing module is quite effective on its own, the lexer allows you to easily define programming language definitions and then tokenize entire strings quickly. The lexer module takes the hassle out of having to code (sometimes painful) parser combinators for things like comments, strings, floating-point values, identifiers, etc.
 
 ** Defining a language lexer
 
