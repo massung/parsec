@@ -21,7 +21,7 @@ make_lexer () ->
 	    ident_letter=parsec:choice([?LETTER,special_symbol()]),
 	    op_start=pzero,
 	    op_letter=pzero,
-	    reserved_names=["lambda","let"],
+	    reserved_names=["lambda","let","cond","setq","atom","nil","quote"],
 	    reserved_ops=[]
 	  }.
 

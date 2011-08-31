@@ -1,0 +1,129 @@
+* Summary
+
+This is a Parsec-style parsing module and token lexer for Erlang. It's not quite as powerful as Haskell's Parsec library (see http://legacy.cs.uu.nl/daan/parsec.html), but it's pretty good and easy to use.
+
+It is extremely helpful to have a solid understanding of Monads. If you don't, that's fine, and you will still be able to use this module, but you may have a slightly more difficult time creating some of the more complex combinators that are possible.
+
+* Usage Basics (Quickstart)
+
+At its core, you can think of the parser as a state that's constantly being updated as the next function in the parser is called. Along with the updated state is the previous value that was just parsed. You parse a string by binding functions (parser combinators) together. When the final combinator finishes, the final result is returned.
+
+** A simple example
+
+Let's say we wanted to parse a simple addition expression like "1+2". There are several ways to go about doing this. The simplest would be to use the parsec:do/1 function in order to just verify that what we expect to be there is there:
+
+: >> parsec:parse("1+2",parsec:do([parsec:char($1),parsec:char($+),parsec:char($2)])).
+: {ok,50,[]}
+
+Examining the return value, we see it was successul, the result of the parsec:do/1 parser combinator was 50 (the character $2), and an empty list - or empty string - meaning that the entire input source was parsed.
+
+** Extending it a little
+
+We parsed the string, but didn't really get to do anything with it. In order to start actually accomplishing something, let's make a parser combinator that parses an integer:
+
+: >> Digits = parsec:many1(parsec:one_of("0123456789")).
+: >> Int = parsec:bind(Digits,fun (X) -> parsec:return(list_to_integer(X)) end).
+
+Taking a closer look at what's defined... 
+
+Digits is a combinator that expects to parse 1 or more of another combinator, which is one of a list of characters (digits). 
+
+Int is a bit more complex. First, it's going to bind the results of one combinator and hand it off to a function. So, it takes the results of whatever was parsed by Digits and passes it the fun. Inside that fun a new combinator is created that will return what was passed in, converted to an integer.
+
+Let's try it...
+
+: >> parsec:parse("1038340", Int).
+: {ok,103840,[]}
+
+Now that we have a combinator that can parse an integer and return it, let's use it to improve our initial math parser:
+
+: >> parsec:parse("1+2",parsec:do([Int,parsec:char($+),Int])).
+: {ok,2,[]}
+
+We essentially got the same value returned, only this time converted to an integer. More importantly, we no longer require $1 or $2, we can parse any numbers in our equation.
+
+** Computing a result
+
+Just like we bound a combinator to parse digits to a function that could return those digits converted to an integer, we can also chain many values together. So let's create a combinator that does just that.
+
+: >> Add=parsec:bind(Int,fun (A) -> parsec:bind(parsec:do([parsec:char($+),Int]),fun (B) -> parsec:return(A+B) end) end).
+
+Looking closer, we first parse an Int and pass it into A. We then bind a parsec:do/1 combinator (which returns the last item parsed) to B, finally returning A+B. Let's test it:
+
+: >> parsec:parse("10+20",Add).
+: {ok,30,[]}
+
+* One-liners and Common Parse Combinators
+
+** The fail combinator
+
+: >> parsec:parse("test",parsec:pzero()).
+: pzero
+
+** Capturing whatever text was parsed
+
+: >> parsec:parse("test",parsec:capture(parsec:one_of("stuv"))).
+: {ok,"t","est"}
+
+** Checking for the end of the stream
+
+: >> parsec:parse("",parsec:eof()).
+: {ok,eof,[]}
+
+** Matching any character
+
+: >> parsec:parse("2",parsec:any_char()).
+: {ok,50,[]}
+
+** Attempt to parse with a default result
+
+: >> parsec:parse("aaaa",parsec:option(not_found,parsec:char($b))).
+: {ok,not_found,"aaaa"}
+
+** Parsing combinators separated by a combinator
+
+: >> parsec:parse("a,a,a",parsec:sep_by1(parsec:char($a),parsec:char($,))).
+: {ok,"aaa",[]}
+
+** Parsing until a combinator is found
+
+: >> parsec:parse("abc.",parsec:many_till(parsec:any_char(),parsec:char($.))).
+: {ok,"abc",[]}
+
+** Parsing one of a list of combinators
+
+: >> parsec:parse("b",parsec:choice([parsec:char($a),parsec:char($b)])).
+: {ok,98,[]}
+
+** And more...
+
+There are many other parser combinators included with the parsec module that weren't covered here. I recommend taking a look at parsec.erl and looking at the exported functions. Each is commented to describe how it can be used. There are also several combinators defined as macros in include/parsec.hrl. These are combinators for parsing letters, digits, whitespace, newlines, etc.
+
+* The Lexer Module
+
+While the parsing module is quite effective on its own, the lexer allows you to easily define programming language definitiosn and then tokenize entire strings quickly. The lexer module takes the hassle out of having to code (sometimes painful) parser combinators for things like comments, strings, floating-point values, identifiers, etc.
+
+** Defining a language lexer
+
+In include/lexer.hrl is the record definition for a lexer. This is where you define the basics of your language: comment styles, identifiers, reserved identifiers, operators, etc. An example language definition for a simple Lisp parser can be found in src/lisp_parser.erl.
+
+** Lexemes
+
+At the heart of the lexer module are two functions: lexer:whitespace/1 and lexer:lexeme/2. The whitespace function skips over all whitespace (and newlines) as well as comments as defined by your lexer. The lexeme function is a slight more complex. It parses a combinator, then skips over any whitespace/comments, and returns what was parsed by the combinator.
+
+It's important to remember that the lexer:lexeme/2 function is available to you for use. If you don't like the way the lexer module parses (for example) hexadecimal values, it's very easy for you to write your own combinator to do so and pass it through the lexeme combinator in order to gain all the benefits of the lexer module.
+
+** Using a lexer to tokenize a string
+
+The best example is that given in the src/lisp_parser.erl example module. It's recommend you load this module at least once in the REPL and play with the lisp_parser:parse/1 function a little:
+
+: >> lisp_parser:parse("10 ; this is a comment").
+: {ok,{num,10},[]}
+
+: >> lisp_parser:parse("(a #| b |# c)").
+: {ok,{list,[{id,a},{id,c}]},[]}
+
+* Good Luck!
+
+Hopefully this was a decent introduction to using the parsec module for Erlang. Feel free to email me if you are having problems or have some suggestions.
+

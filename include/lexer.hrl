@@ -13,8 +13,8 @@
 
 %% language definition
 -record(lexer, {
-	  comment_start :: parse_combinator(binary()),
-	  comment_end :: parse_combinator(binary()),
+	  comment_start :: parse_combinator(string()),
+	  comment_end :: parse_combinator(string()),
 	  comment_line :: parse_combinator(string()),
 	  ident_start :: parse_combinator(integer()),
 	  ident_letter :: parse_combinator(integer()),
