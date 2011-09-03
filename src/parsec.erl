@@ -15,6 +15,7 @@
 -export([bind/2,
 	 bind_/2,
 	 return/1,
+	 chain/2,
 	 do/1,
 	 parse/2,
 	 pzero/0,
@@ -63,6 +64,13 @@ return (X) ->
     fun ({_,Src}) -> {X,Src};
 	(Error) -> Error
     end.
+
+%% helper function
+chain_ ([P],Acc,F) -> bind(P,fun (X) -> F(Acc++[X]) end);
+chain_ ([P|PS],Acc,F) -> bind(P,fun (X) -> chain_(PS,Acc++[X],F) end).
+
+%% chain capture, passing a list of values to a function
+chain (PS,F) -> chain_(PS,[],F).
 
 %% bind a list of combinators, ignoring all results except the last
 do ([P]) -> bind(P,fun (X) -> return(X) end);
